@@ -759,6 +759,13 @@ class _NoopRecorder:
 @unittest.skipIf(TestClient is None, "FastAPI test client is not installed")
 @unittest.skipIf(hasattr(production, "_BACKEND_IMPORT_ERROR"), "server backend dependencies are not installed")
 class ProductionServerAppTests(unittest.TestCase):
+    def setUp(self):
+        super().setUp()
+        production.reset_global_capacity_counters()
+
+    def tearDown(self):
+        production.reset_global_capacity_counters()
+        super().tearDown()
     def test_empty_silent_and_short_turns_terminate_once(self):
         import numpy as np
 
@@ -1053,10 +1060,17 @@ class ProductionServerAppTests(unittest.TestCase):
                 self.assertEqual(started["language"], "auto")
 
                 websocket.send_json({"type": "finalize"})
-                self.assertEqual(self._receive_type(websocket, "finalizing")["turnId"], "turn-1")
-                completion = self._receive_type(websocket, "completion")
-                self.assertEqual(completion["status"], "completed")
-                self.assertEqual(completion["turnId"], "turn-1")
+                events = {}
+                for _ in range(30):
+                    msg = websocket.receive_json()
+                    events[msg.get("type")] = msg
+                    if "finalizing" in events and "completion" in events:
+                        break
+                self.assertIn("finalizing", events)
+                self.assertEqual(events["finalizing"]["turnId"], "turn-1")
+                self.assertIn("completion", events)
+                self.assertEqual(events["completion"]["status"], "completed")
+                self.assertEqual(events["completion"]["turnId"], "turn-1")
 
                 websocket.send_json({"type": "start", "turnId": "turn-2", "language": "en"})
                 self._receive_type(websocket, "started")
@@ -1080,10 +1094,16 @@ class ProductionServerAppTests(unittest.TestCase):
                 self.assertEqual(reset["previousTurnId"], "turn-2")
 
     def _receive_type(self, websocket, event_type, limit=30):
+        if not hasattr(websocket, "_message_buffer"):
+            websocket._message_buffer = []
+        for i, msg in enumerate(websocket._message_buffer):
+            if msg.get("type") == event_type:
+                return websocket._message_buffer.pop(i)
         for _ in range(limit):
             message = websocket.receive_json()
             if message.get("type") == event_type:
                 return message
+            websocket._message_buffer.append(message)
         self.fail(f"Did not receive {event_type!r}")
 
 

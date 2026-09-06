@@ -67,6 +67,15 @@ _MAX_LIVE_STREAM_OPERATIONS = 4
 _LIVE_STREAM_OPERATION_SLOTS = threading.BoundedSemaphore(
     _MAX_LIVE_STREAM_OPERATIONS
 )
+
+
+def reset_global_capacity_counters() -> None:
+    """Reset module-level capacity semaphores (e.g., between tests)."""
+    global _LIVE_CANCEL_SLOTS, _LIVE_STREAM_OPERATION_SLOTS
+    _LIVE_CANCEL_SLOTS = threading.BoundedSemaphore(_MAX_LIVE_CANCEL_THREADS)
+    _LIVE_STREAM_OPERATION_SLOTS = threading.BoundedSemaphore(
+        _MAX_LIVE_STREAM_OPERATIONS
+    )
 REMOTE_LANGUAGES = ("en", "de", "fr", "es", "it", "pt", "ru")
 # ``auto`` asks the realtime/final provider to detect the language. Keep the
 # seven explicit AgentTalk languages alongside it in the public contract.
