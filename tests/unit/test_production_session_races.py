@@ -383,6 +383,13 @@ class _PausedTerminalAdmissionManager(production.OrderedConnectionManager):
     "production server backend dependencies are not installed",
 )
 class ProductionSessionRaceRegressionTests(unittest.TestCase):
+    def setUp(self):
+        super().setUp()
+        production.reset_global_capacity_counters()
+
+    def tearDown(self):
+        production.reset_global_capacity_counters()
+        super().tearDown()
     """Regression tests for the explicit production turn state machine."""
 
     @staticmethod
